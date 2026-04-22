@@ -108,32 +108,34 @@ function SmtpTab() {
   };
 
   // 🔥 SEND TEST EMAIL
-  const sendTest = async () => {
-    if (!testTo) return toast.error('Hãy nhập email nhận thử');
+const sendTest = async () => {
+  if (!testTo) return toast.error('Hãy nhập email nhận thử');
 
-    setTesting(true);
+  setTesting(true);
 
-    try {
-      const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-email`;
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
 
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+    const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-email`;
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session?.access_token}`,
+      },
+      body: JSON.stringify({
+        template_slug: 'order_received',
+        to: testTo,
+        vars: {
+          order_id: 'TEST-000',
+          customer_name: 'Học viên thử',
+          course_title: 'Khoá học demo',
+          amount: '100.000',
+          email: testTo,
         },
-        body: JSON.stringify({
-          template_slug: 'order_received',
-          to: testTo,
-          vars: {
-            order_id: 'TEST-000',
-            customer_name: 'Học viên thử',
-            course_title: 'Khoá học demo',
-            amount: '100.000',
-            email: testTo,
-          },
-        }),
-      });
+      }),
+    });
 
       const json = await res.json();
 

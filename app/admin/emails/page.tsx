@@ -54,32 +54,68 @@ function SmtpTab() {
   const [cfg, setCfg] = useState<any>(null);
   const [testTo, setTestTo] = useState('');
   const [testing, setTesting] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    (async () => {
-      const { data } = await supabase.from('smtp_config').select('*').eq('id', 1).maybeSingle();
-      setCfg(data || { id: 1 });
-    })();
-  }, []);
+  // 🔥 LOAD DATA
+  const load = async () => {
+    const { data, error } = await supabase
+      .from('smtp_config')
+      .select('*')
+      .eq('id', 1)
+      .maybeSingle();
 
-  const save = async () => {
-    const { error } = await supabase.from('smtp_config').update({
-      host: cfg.host || '',
-      port: Number(cfg.port || 587),
-      username: cfg.username || '',
-      password: cfg.password || '',
-      from_email: cfg.from_email || '',
-      from_name: cfg.from_name || 'Academy',
-    }).eq('id', 1);
-    if (error) return toast.error(error.message);
-    toast.success('Đã lưu cấu hình SMTP');
+    if (error) {
+      console.error(error);
+      toast.error('Không load được cấu hình SMTP');
+      return;
+    }
+
+    setCfg(data || { id: 1 });
+    setLoading(false);
   };
 
+  useEffect(() => {
+    load();
+  }, []);
+
+  // 🔥 SAVE (FIX CHUẨN)
+  const save = async () => {
+    const { data, error } = await supabase
+      .from('smtp_config')
+      .update({
+        host: cfg.host || '',
+        port: Number(cfg.port || 587),
+        username: cfg.username || '',
+        password: cfg.password || '',
+        from_email: cfg.from_email || '',
+        from_name: cfg.from_name || 'Academy',
+      })
+      .eq('id', 1)
+      .select()        // 👈 QUAN TRỌNG
+      .single();       // 👈 QUAN TRỌNG
+
+    if (error) {
+      console.error(error);
+      return toast.error(error.message);
+    }
+
+    console.log('SMTP UPDATED:', data);
+
+    toast.success('Đã lưu cấu hình SMTP');
+
+    // 🔥 reload lại UI
+    await load();
+  };
+
+  // 🔥 SEND TEST EMAIL
   const sendTest = async () => {
     if (!testTo) return toast.error('Hãy nhập email nhận thử');
+
     setTesting(true);
+
     try {
       const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-email`;
+
       const res = await fetch(url, {
         method: 'POST',
         headers: {
@@ -89,21 +125,34 @@ function SmtpTab() {
         body: JSON.stringify({
           template_slug: 'order_received',
           to: testTo,
-          vars: { order_id: 'TEST-000', customer_name: 'Học viên thử', course_title: 'Khoá học demo', amount: '100.000', email: testTo },
+          vars: {
+            order_id: 'TEST-000',
+            customer_name: 'Học viên thử',
+            course_title: 'Khoá học demo',
+            amount: '100.000',
+            email: testTo,
+          },
         }),
       });
+
       const json = await res.json();
+
       if (!res.ok || json.ok === false) {
         toast.error(json.error || 'Gửi thử thất bại');
       } else {
         toast.success('Đã gửi email thử thành công');
       }
+    } catch (err) {
+      console.error(err);
+      toast.error('Lỗi khi gửi email');
     } finally {
       setTesting(false);
     }
   };
 
-  if (!cfg) return <div className="text-white/60">Đang tải...</div>;
+  if (loading || !cfg) {
+    return <div className="text-white/60">Đang tải...</div>;
+  }
 
   return (
     <div className="glass rounded-2xl p-6">
@@ -111,17 +160,27 @@ function SmtpTab() {
         <Server size={16} className="text-blue-400" />
         <h2 className="text-lg font-semibold">Máy chủ SMTP</h2>
       </div>
-      <p className="text-sm text-white/60">Cấu hình SMTP để hệ thống gửi email giao dịch.</p>
+
+      <p className="text-sm text-white/60">
+        Cấu hình SMTP để hệ thống gửi email giao dịch.
+      </p>
+
       <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-        <F label="Host" value={cfg.host} onChange={(v) => setCfg({ ...cfg, host: v })} placeholder="smtp.gmail.com" />
-        <F label="Port" value={String(cfg.port || 587)} onChange={(v) => setCfg({ ...cfg, port: v })} placeholder="587" />
-        <F label="Username" value={cfg.username} onChange={(v) => setCfg({ ...cfg, username: v })} placeholder="you@domain.com" />
+        <F label="Host" value={cfg.host} onChange={(v) => setCfg({ ...cfg, host: v })} />
+        <F label="Port" value={String(cfg.port || 587)} onChange={(v) => setCfg({ ...cfg, port: v })} />
+        <F label="Username" value={cfg.username} onChange={(v) => setCfg({ ...cfg, username: v })} />
         <F label="Password" value={cfg.password} onChange={(v) => setCfg({ ...cfg, password: v })} type="password" />
         <F label="From email" value={cfg.from_email} onChange={(v) => setCfg({ ...cfg, from_email: v })} />
         <F label="From name" value={cfg.from_name} onChange={(v) => setCfg({ ...cfg, from_name: v })} />
       </div>
-      <div className="mt-5 flex flex-wrap gap-3">
-        <button onClick={save} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium">Lưu cấu hình</button>
+
+      <div className="mt-5 flex gap-3">
+        <button
+          onClick={save}
+          className="btn-primary rounded-lg px-4 py-2 text-sm font-medium"
+        >
+          Lưu cấu hình
+        </button>
       </div>
 
       <div className="mt-6 rounded-xl border border-white/10 bg-white/[0.03] p-4">
@@ -129,15 +188,20 @@ function SmtpTab() {
           <Mail size={14} className="text-orange-400" />
           <span className="text-sm font-medium">Gửi email thử</span>
         </div>
-        <p className="mt-1 text-xs text-white/50">Gửi một email mẫu để kiểm tra cấu hình SMTP.</p>
-        <div className="mt-3 flex flex-wrap gap-2">
+
+        <p className="mt-1 text-xs text-white/50">
+          Gửi một email mẫu để kiểm tra cấu hình SMTP.
+        </p>
+
+        <div className="mt-3 flex gap-2">
           <input
             type="email"
             placeholder="email-nhan-thu@domain.com"
             value={testTo}
             onChange={(e) => setTestTo(e.target.value)}
-            className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-blue-500"
+            className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none"
           />
+
           <button
             onClick={sendTest}
             disabled={testing}

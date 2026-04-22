@@ -114,7 +114,13 @@ const sendTest = async () => {
   setTesting(true);
 
   try {
+    // 🔥 LẤY SESSION
     const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session) {
+      toast.error('Bạn chưa đăng nhập');
+      return;
+    }
 
     const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-email`;
 
@@ -122,8 +128,13 @@ const sendTest = async () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-         apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-},
+
+        // 🔥 QUAN TRỌNG NHẤT
+        Authorization: `Bearer ${session.access_token}`,
+
+        // vẫn giữ apikey (không bắt buộc nhưng nên có)
+        apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      },
       body: JSON.stringify({
         template_slug: 'order_received',
         to: testTo,
@@ -137,20 +148,21 @@ const sendTest = async () => {
       }),
     });
 
-      const json = await res.json();
+    const json = await res.json();
 
-      if (!res.ok || json.ok === false) {
-        toast.error(json.error || 'Gửi thử thất bại');
-      } else {
-        toast.success('Đã gửi email thử thành công');
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error('Lỗi khi gửi email');
-    } finally {
-      setTesting(false);
+    if (!res.ok || json.ok === false) {
+      toast.error(json.error || 'Gửi thử thất bại');
+    } else {
+      toast.success('Đã gửi email thử thành công');
     }
-  };
+
+  } catch (err) {
+    console.error(err);
+    toast.error('Lỗi khi gửi email');
+  } finally {
+    setTesting(false);
+  }
+};
 
   if (loading || !cfg) {
     return <div className="text-white/60">Đang tải...</div>;

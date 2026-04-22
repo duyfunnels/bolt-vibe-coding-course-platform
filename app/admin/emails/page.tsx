@@ -122,8 +122,9 @@ const sendTest = async () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${session?.access_token}`,
-      },
+         apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+},
       body: JSON.stringify({
         template_slug: 'order_received',
         to: testTo,

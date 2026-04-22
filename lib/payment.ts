@@ -1,65 +1,59 @@
-import { createClient } from '@supabase/supabase-js'
+import { supabaseAdmin } from '@/lib/supabase/admin'
+import { handlePaidSideEffects } from '@/app/api/payment-webhook/route'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+export async function processBankTransaction({
+  order_id,
+  amount
+}: {
+  order_id: string
+  amount: number
+}) {
+  const db = supabaseAdmin()
 
-// 🔥 MAIN FUNCTION
-export async function handleOrderPaid(orderId: string) {
   // 1. lấy order
-  const { data: order } = await supabase
+  const { data: order } = await db
     .from('orders')
     .select('*')
-    .eq('id', orderId)
-    .single()
+    .eq('order_id', order_id)
+    .maybeSingle()
 
-  if (!order) return
+  if (!order) throw new Error('order not found')
 
-  // ❗ chống chạy lại
-  if (order.is_activated) return
+  // 2. tính tổng tiền
+  const { data: transactions } = await db
+    .from('bank_transactions')
+    .select('money_in')
+    .eq('order_id', order_id)
 
-  // ❗ chỉ chạy khi paid
-  if (order.status !== 'paid') return
+  const total =
+    transactions?.reduce(
+      (sum, t) => sum + Number(t.money_in || 0),
+      0
+    ) || 0
 
-  // 2. check user
-  const { data: existingUser } =
-    await supabase.auth.admin.getUserByEmail(order.email)
+  const remain = Number(order.amount || 0) - total
 
-  let userId: string
+  // 3. update order
+  if (remain <= 0 && order.status !== 'paid') {
+    await db
+      .from('orders')
+      .update({
+        total_money_in: total,
+        remain_money: remain,
+        status: 'paid',
+        paid_at: new Date().toISOString()
+      })
+      .eq('order_id', order_id)
 
-  if (!existingUser?.user) {
-    // tạo user mới
-    const password = Math.random().toString(36).slice(-8)
-
-    const { data: newUser } = await supabase.auth.admin.createUser({
-      email: order.email,
-      password,
-      email_confirm: true
-    })
-
-    userId = newUser.user.id
-
-    console.log('Created user:', order.email, password)
+    // 🔥 trigger DUY NHẤT
+    await handlePaidSideEffects(order_id)
   } else {
-    userId = existingUser.user.id
+    await db
+      .from('orders')
+      .update({
+        total_money_in: total,
+        remain_money: remain
+      })
+      .eq('order_id', order_id)
   }
-
-  // 3. assign course
-  await supabase.from('user_courses').insert({
-    user_id: userId,
-    course_id: order.course_id
-  })
-
-  // 4. update order
-  await supabase
-    .from('orders')
-    .update({
-      is_activated: true,
-      activated_at: new Date().toISOString()
-    })
-    .eq('id', orderId)
-
-  // 5. email (placeholder)
-  console.log('Send email to:', order.email)
 }

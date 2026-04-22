@@ -163,15 +163,29 @@ function TemplatesTab() {
   useEffect(() => { load(); }, []);
 
   const save = async () => {
-    if (!active) return;
-    const { error } = await supabase.from('email_templates').update({
+  if (!active) return;
+
+  const { data, error } = await supabase
+    .from('email_templates')
+    .update({
       subject: active.subject,
       html: active.html,
-    }).eq('id', active.id);
-    if (error) return toast.error(error.message);
-    toast.success('Đã lưu mẫu email');
-    load();
-  };
+    })
+    .eq('id', active.id)
+    .select()
+    .single(); // 👈 thêm dòng này
+
+  if (error) {
+    console.error(error);
+    return toast.error(error.message);
+  }
+
+  console.log('UPDATED:', data); // debug luôn
+
+  toast.success('Đã lưu mẫu email');
+
+  await load(); // 👈 thêm await cho chắc
+};
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[260px_1fr]">

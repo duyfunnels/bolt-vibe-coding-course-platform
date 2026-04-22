@@ -101,7 +101,12 @@ export async function POST(req: Request) {
         .eq('order_id', order_id);
 
       // 🔥 trigger flow chính
-      await handlePaidSideEffects(order_id);
+      import { processBankTransaction } from '@/lib/payment'
+
+await processBankTransaction({
+  order_id,
+  amount: amountNum
+});
     } else {
       await db
         .from('orders')

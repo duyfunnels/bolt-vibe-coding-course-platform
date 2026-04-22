@@ -143,14 +143,15 @@ async function handlePaidSideEffects(order_id: string) {
     .maybeSingle();
 
   // 🔥 3. check user tồn tại
-  const { data: existingUser } =
-    await db.auth.admin.getUserByEmail(order.email);
+  const { data: users } = await db.auth.admin.listUsers();
+  const existingUser = users?.users?.find(
+  (u) => u.email === order.email);
 
   let userId = order.user_id;
   let password: string | null = null;
 
   // 🔥 4. tạo user nếu chưa có
-  if (!existingUser?.user) {
+  if (!existingUser) {
     password = randomPassword();
 
     const created = await db.auth.admin.createUser({
@@ -178,7 +179,7 @@ async function handlePaidSideEffects(order_id: string) {
       });
     }
   } else {
-    userId = existingUser.user.id;
+    userId = existingUser.id;
   }
 
   // 🔥 5. assign course (LUÔN LUÔN)

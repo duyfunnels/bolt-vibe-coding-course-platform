@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 222 47% 6%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 8%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 8%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 214 95% 58%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 217 19% 14%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 19% 14%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 25 95% 55%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217 19% 18%;
+    --input: 217 19% 14%;
+    --ring: 214 95% 58%;
+    --radius: 0.75rem;
+  }
+}
+
+html, body {
+  background: #07090f;
+  color: hsl(var(--foreground));
+  min-height: 100vh;
+}
+
+body {
+  background:
+    radial-gradient(1000px 500px at 10% -20%, rgba(59,130,246,0.18), transparent 60%),
+    radial-gradient(800px 400px at 100% 10%, rgba(249,115,22,0.12), transparent 60%),
+    #07090f;
+}
+
+* { border-color: hsl(var(--border)); }
+
+.glass {
+  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+  border: 1px solid rgba(255,255,255,0.08);
+  backdrop-filter: blur(10px);
+}
+
+.glow-blue { box-shadow: 0 0 60px -10px rgba(59,130,246,0.45); }
+.glow-orange { box-shadow: 0 0 60px -10px rgba(249,115,22,0.4); }
+
+.grad-text {
+  background: linear-gradient(90deg, #60a5fa 0%, #f97316 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: white;
+  transition: all .2s ease;
+}
+.btn-primary:hover { filter: brightness(1.1); box-shadow: 0 10px 30px -10px rgba(37,99,235,.6); }
+
+.btn-accent {
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  color: white;
+  transition: all .2s ease;
+}
+.btn-accent:hover { filter: brightness(1.1); box-shadow: 0 10px 30px -10px rgba(249,115,22,.6); }
+
+input, textarea, select {
+  color-scheme: dark;
+}

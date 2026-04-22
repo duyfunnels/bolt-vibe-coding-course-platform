@@ -1,92 +1,58 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { processBankTransaction } from '@/lib/payment'
 
 export async function POST(req: Request) {
   try {
-    const { api_key } = await req.json()
-
-    if (!api_key || typeof api_key !== 'string') {
-      return NextResponse.json(
-        { ok: false, error: 'API key is required' },
-        { status: 400 }
-      )
-    }
-
-    // 🔥 test call Sepay API
-    const res = await fetch(
-      'https://my.sepay.vn/userapi/bankaccounts/list',
-      {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${api_key.trim()}`,
-          Accept: 'application/json',
-        },
-      }
-    )
-
-    // ❗ nếu lỗi network (Bolt sẽ hay bị)
-    if (!res) {
-      return NextResponse.json({
-        ok: false,
-        error: 'Cannot connect to Sepay (try deploy to Vercel)'
-      })
-    }
-
-    // ❗ nếu key sai
-    if (res.status === 401) {
-      return NextResponse.json({
-        ok: false,
-        error: 'Invalid API key'
-      })
-    }
-
-    // ❗ nếu API lỗi
-    if (!res.ok) {
-      return NextResponse.json({
-        ok: false,
-        error: `Sepay error: HTTP ${res.status}`
-      })
-    }
-
-    const data = await res.json().catch(() => null)
-
-    // 🔥 KHÔNG validate quá chặt
-    if (!data) {
-      return NextResponse.json({
-        ok: false,
-        error: 'Invalid response from Sepay'
-      })
-    }
-
-    // 🔥 lưu config
     const db = supabaseAdmin()
 
-    const { error } = await db
+    const { data: cfg } = await db
       .from('payment_configs')
-      .update({
-        sepay_api_key: api_key.trim(),
-        sepay_verified: true,
-        sepay_account_info: data,
-        sepay_verified_at: new Date().toISOString(),
-      })
+      .select('transfer_prefix, sepay_api_key')
       .eq('id', 1)
+      .maybeSingle()
 
-    if (error) {
-      return NextResponse.json(
-        { ok: false, error: error.message },
-        { status: 500 }
-      )
+    const token =
+      req.headers.get('authorization')?.replace('Bearer ', '') || ''
+
+    if (cfg?.sepay_api_key && token !== cfg.sepay_api_key) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
     }
 
-    return NextResponse.json({
-      ok: true,
-      message: 'Sepay verified successfully'
+    const body = await req.json()
+
+    if (body.transferType && body.transferType !== 'in') {
+      return NextResponse.json({ ok: true })
+    }
+
+    const content = body.content || ''
+    const amount = Number(body.transferAmount || 0)
+
+    const prefix = cfg?.transfer_prefix || 'ORD'
+    const match = content.match(new RegExp(`${prefix}\\d{5,}`, 'i'))
+
+    if (!match || amount <= 0) {
+      return NextResponse.json({ error: 'invalid data' }, { status: 400 })
+    }
+
+    const order_id = match[0].toUpperCase()
+
+    await db.from('bank_transactions').insert({
+      order_id,
+      money_in: amount,
+      bank_ref: body.referenceCode || `sepay-${Date.now()}`,
+      content,
+      source: 'sepay',
+      raw: body,
     })
 
-  } catch (e: any) {
-    return NextResponse.json({
-      ok: false,
-      error: e?.message || 'verify failed'
+    await processBankTransaction({
+      order_id,
+      amount,
     })
+
+    return NextResponse.json({ ok: true })
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }

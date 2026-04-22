@@ -36,7 +36,12 @@ export async function POST(req: Request) {
     if (insErr && !insErr.message.includes('duplicate')) {
       return NextResponse.json({ error: insErr.message }, { status: 500 });
     }
-    await handlePaidSideEffects(order_id);
+    import { processBankTransaction } from '@/lib/payment'
+
+await processBankTransaction({
+  order_id,
+  amount
+});
     return NextResponse.json({ ok: true, order_id });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'server error' }, { status: 500 });

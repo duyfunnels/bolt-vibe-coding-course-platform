@@ -31,7 +31,7 @@ function toEmbed(provider: string, url: string): string {
       return `https://player.vimeo.com/video/${id}`;
     }
     if (provider === 'gumlet') {
-      return url.includes('/embed/') ? url : url.replace('/watch/', '/embed/');
+      return url.includes('play.gumlet.io/embed/') ? url : url.replace('gumlet.tv/watch/', 'play.gumlet.io/embed/');
     }
   } catch {}
   return url;

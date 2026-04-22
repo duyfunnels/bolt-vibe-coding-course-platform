@@ -1,9 +1,9 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { handlePaidSideEffects } from '@/app/api/payment-webhook/route'
+import { handlePaidSideEffects } from './payment-core'
 
 export async function processBankTransaction({
   order_id,
-  amount
+  amount,
 }: {
   order_id: string
   amount: number
@@ -19,7 +19,7 @@ export async function processBankTransaction({
 
   if (!order) throw new Error('order not found')
 
-  // 2. tính tổng tiền
+  // 2. lấy tất cả transaction
   const { data: transactions } = await db
     .from('bank_transactions')
     .select('money_in')
@@ -41,18 +41,18 @@ export async function processBankTransaction({
         total_money_in: total,
         remain_money: remain,
         status: 'paid',
-        paid_at: new Date().toISOString()
+        paid_at: new Date().toISOString(),
       })
       .eq('order_id', order_id)
 
-    // 🔥 trigger DUY NHẤT
+    // 🔥 TRIGGER DUY NHẤT
     await handlePaidSideEffects(order_id)
   } else {
     await db
       .from('orders')
       .update({
         total_money_in: total,
-        remain_money: remain
+        remain_money: remain,
       })
       .eq('order_id', order_id)
   }

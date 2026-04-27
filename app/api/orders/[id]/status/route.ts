@@ -2,6 +2,23 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { handlePaidSideEffects } from '@/lib/payment-core'
 
+// ✅ GET: lấy order (cho PayPage)
+export async function GET(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
+  const db = supabaseAdmin()
+
+  const { data } = await db
+    .from('orders')
+    .select('*')
+    .eq('order_id', params.id)
+    .maybeSingle()
+
+  return NextResponse.json(data)
+}
+
+// ✅ POST: update status + trigger logic
 export async function POST(
   req: Request,
   { params }: { params: { id: string } }
@@ -10,33 +27,25 @@ export async function POST(
     const db = supabaseAdmin()
     const { status } = await req.json()
 
-    const order_id = params.id
-
-    if (!order_id || !status) {
-      return NextResponse.json(
-        { error: 'missing order_id or status' },
-        { status: 400 }
-      )
+    if (!status) {
+      return NextResponse.json({ error: 'missing status' }, { status: 400 })
     }
 
-    // 🔥 1. update order
+    // 🔥 update order
     const { data: order } = await db
       .from('orders')
       .update({ status })
-      .eq('order_id', order_id)
+      .eq('order_id', params.id)
       .select()
       .maybeSingle()
 
     if (!order) {
-      return NextResponse.json(
-        { error: 'order not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'order not found' }, { status: 404 })
     }
 
-    // 🔥 2. nếu chuyển sang paid → trigger flow
+    // 🔥 QUAN TRỌNG: trigger khi paid
     if (status === 'paid') {
-      await handlePaidSideEffects(order_id)
+      await handlePaidSideEffects(params.id)
     }
 
     return NextResponse.json({ ok: true })

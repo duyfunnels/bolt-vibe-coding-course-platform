@@ -16,7 +16,7 @@ export default function PayPage({ params }: { params: { orderId: string } }) {
   useEffect(() => {
     let mounted = true;
     const load = async () => {
-      const res = await fetch(`/api/orders/${params.orderId}/status`, { cache: 'no-store' });
+      const res = await fetch(`/api/orders/${params.orderId}`, { cache: 'no-store' });
       if (!res.ok) return;
       const o = await res.json();
       if (!mounted) return;

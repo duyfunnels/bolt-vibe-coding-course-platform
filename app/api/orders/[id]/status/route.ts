@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { handlePaidSideEffects, handleUnpaidSideEffects  } from '@/lib/payment-core'
+import {
+  handlePaidSideEffects,
+  handleUnpaidSideEffects,
+} from '@/lib/payment-core'
 
 // =========================
 // ✅ GET: lấy order
@@ -56,7 +59,6 @@ export async function POST(
       order_id: params.id,
       from: existing.status,
       to: status,
-      is_activated: existing.is_activated,
     })
 
     // 🔥 update status
@@ -69,17 +71,17 @@ export async function POST(
       .eq('order_id', params.id)
 
     // =========================
-    // 🔥 LOGIC CHUẨN
+    // 🔥 LOGIC FIX CHUẨN
     // =========================
 
-    // ✅ ACTIVATE (chỉ khi chưa activate)
-    if (status === 'paid' && !existing.is_activated) {
+    // ✅ ACTIVATE
+    if (status === 'paid') {
       console.log('🔥 ACTIVATE COURSE')
       await handlePaidSideEffects(params.id)
     }
 
-    // ❌ REVOKE (chỉ khi đã từng activate)
-    if (status !== 'paid' && existing.is_activated) {
+    // ❌ REVOKE (LUÔN CHẠY nếu không phải paid)
+    if (status !== 'paid') {
       console.log('🚫 REVOKE COURSE')
       await handleUnpaidSideEffects(params.id)
     }

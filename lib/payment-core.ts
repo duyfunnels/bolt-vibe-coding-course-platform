@@ -15,7 +15,6 @@ export async function handlePaidSideEffects(order_id: string) {
 
   console.log('🔥 handlePaidSideEffects', order_id)
 
-  // 1. lấy order
   const { data: order } = await db
     .from('orders')
     .select('*')
@@ -38,14 +37,12 @@ export async function handlePaidSideEffects(order_id: string) {
     return
   }
 
-  // 2. lấy course
   const { data: course } = await db
     .from('courses')
     .select('title,slug')
     .eq('id', order.course_id)
     .maybeSingle()
 
-  // 3. tìm user
   const { data: users } = await db.auth.admin.listUsers()
   const existingUser = users?.users?.find(
     (u) => u.email === order.email
@@ -54,7 +51,7 @@ export async function handlePaidSideEffects(order_id: string) {
   let userId = order.user_id
   let password: string | null = null
 
-  // 4. tạo user nếu chưa có
+  // tạo user nếu chưa có
   if (!existingUser) {
     console.log('👤 creating new user')
 
@@ -87,13 +84,12 @@ export async function handlePaidSideEffects(order_id: string) {
     userId = existingUser.id
   }
 
-  // ❗ nếu vẫn không có user → stop
   if (!userId) {
     console.log('❌ no userId → abort')
     return
   }
 
-  // 5. assign course
+  // assign course
   console.log('🎓 assign course')
 
   await db.from('user_courses').upsert(
@@ -105,7 +101,7 @@ export async function handlePaidSideEffects(order_id: string) {
     { onConflict: 'user_id,course_id' }
   )
 
-  // 6. mark activated
+  // mark activated
   await db
     .from('orders')
     .update({
@@ -114,7 +110,6 @@ export async function handlePaidSideEffects(order_id: string) {
     })
     .eq('order_id', order_id)
 
-  // 7. email success
   await sendTemplateEmail('payment_success', order.email, {
     order_id,
     course_title: course?.title || '',
@@ -126,7 +121,7 @@ export async function handlePaidSideEffects(order_id: string) {
 
 /**
  * =========================
- * ❌ HANDLE UNPAID (REVOKE)
+ * ❌ HANDLE UNPAID (REVOKE) — FIXED
  * =========================
  */
 export async function handleUnpaidSideEffects(order_id: string) {
@@ -134,7 +129,6 @@ export async function handleUnpaidSideEffects(order_id: string) {
 
   console.log('🚫 handleUnpaidSideEffects', order_id)
 
-  // 1. lấy order
   const { data: order } = await db
     .from('orders')
     .select('*')
@@ -146,29 +140,15 @@ export async function handleUnpaidSideEffects(order_id: string) {
     return
   }
 
-  // ❗ nếu chưa từng activate thì skip
-  if (!order.is_activated) {
-    console.log('⚠️ not activated → skip revoke')
-    return
-  }
+  // 🔥 KHÔNG check is_activated nữa
+  // 🔥 KHÔNG check user_id nữa
 
-  // ❗ nếu chưa có user → không revoke được
-  if (!order.user_id) {
-    console.log('⚠️ no user_id → skip revoke')
-    return
-  }
+  console.log('🧹 deleting access by order_id', order_id)
 
-  console.log('🧹 deleting access', {
-    user_id: order.user_id,
-    course_id: order.course_id,
-  })
-
-  // 2. DELETE quyền học
   const { error } = await db
     .from('user_courses')
     .delete()
-    .eq('user_id', order.user_id)
-    .eq('course_id', order.course_id)
+    .eq('order_id', order_id)
 
   if (error) {
     console.error('❌ delete error:', error)
@@ -176,7 +156,7 @@ export async function handleUnpaidSideEffects(order_id: string) {
     console.log('✅ revoked access')
   }
 
-  // 3. reset trạng thái
+  // reset trạng thái
   await db
     .from('orders')
     .update({

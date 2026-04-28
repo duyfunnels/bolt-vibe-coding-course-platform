@@ -26,12 +26,24 @@ export default function AdminOrderDetail({ params }: { params: { id: string } })
   };
   useEffect(() => { load(); }, [params.id]);
 
-  const setStatus = async (s: string) => {
-    const { error } = await supabase.from('orders').update({ status: s }).eq('order_id', params.id);
-    if (error) return toast.error(error.message);
-    toast.success('Đã cập nhật trạng thái');
-    load();
-  };
+const setStatus = async (s: string) => {
+  const res = await fetch(`/api/orders/${params.id}/status`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ status: s }),
+  });
+
+  const j = await res.json();
+
+  if (!res.ok) {
+    return toast.error(j.error || 'Cập nhật thất bại');
+  }
+
+  toast.success('Đã cập nhật trạng thái');
+  load();
+};
 
   const addTx = async () => {
     const amt = Number(money); if (!amt) return toast.error('Nhập số tiền');

@@ -94,22 +94,35 @@ export async function handlePaidSideEffects(order_id: string) {
 export async function handleUnpaidSideEffects(order_id: string) {
   const db = supabaseAdmin()
 
-  // 1. lấy order
   const { data: order } = await db
     .from('orders')
     .select('*')
     .eq('order_id', order_id)
     .maybeSingle()
 
-  if (!order) return
+  if (!order) {
+    console.log('❌ no order')
+    return
+  }
 
-  // 2. xoá quyền học
-  await db
+  console.log('🚫 revoke start', order_id)
+
+  // 🔥 LOG DEBUG
+  console.log('DELETE WHERE:', {
+    user_id: order.user_id,
+    course_id: order.course_id,
+  })
+
+  const { data, error } = await db
     .from('user_courses')
     .delete()
-    .eq('order_id', order_id)
+    .eq('user_id', order.user_id)
+    .eq('course_id', order.course_id)
+    .select()
 
-  // 3. reset trạng thái activated
+  console.log('DELETE RESULT:', data, error)
+
+  // reset trạng thái
   await db
     .from('orders')
     .update({
@@ -117,6 +130,4 @@ export async function handleUnpaidSideEffects(order_id: string) {
       activated_at: null,
     })
     .eq('order_id', order_id)
-
-  console.log('❌ REVOKED ACCESS:', order_id)
 }

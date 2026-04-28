@@ -90,3 +90,33 @@ export async function handlePaidSideEffects(order_id: string) {
     access_link: `${process.env.NEXT_PUBLIC_SITE_URL}/learn/${course?.slug || ''}`,
   })
 }
+
+export async function handleUnpaidSideEffects(order_id: string) {
+  const db = supabaseAdmin()
+
+  // 1. lấy order
+  const { data: order } = await db
+    .from('orders')
+    .select('*')
+    .eq('order_id', order_id)
+    .maybeSingle()
+
+  if (!order) return
+
+  // 2. xoá quyền học
+  await db
+    .from('user_courses')
+    .delete()
+    .eq('order_id', order_id)
+
+  // 3. reset trạng thái activated
+  await db
+    .from('orders')
+    .update({
+      is_activated: false,
+      activated_at: null,
+    })
+    .eq('order_id', order_id)
+
+  console.log('❌ REVOKED ACCESS:', order_id)
+}

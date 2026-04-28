@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { handlePaidSideEffects } from '@/lib/payment-core'
+import { handlePaidSideEffects, handleUnpaidSideEffects  } from '@/lib/payment-core'
 
 // ✅ GET: lấy order (cho PayPage)
 export async function GET(
@@ -31,21 +31,40 @@ export async function POST(
       return NextResponse.json({ error: 'missing status' }, { status: 400 })
     }
 
-    // 🔥 update order
-    const { data: order } = await db
+    // 🔥 lấy trạng thái cũ
+    const { data: existing } = await db
       .from('orders')
-      .update({ status })
+      .select('*')
       .eq('order_id', params.id)
-      .select()
       .maybeSingle()
 
-    if (!order) {
+    if (!existing) {
       return NextResponse.json({ error: 'order not found' }, { status: 404 })
     }
 
-    // 🔥 QUAN TRỌNG: trigger khi paid
-    if (status === 'paid') {
+    // 🔥 update
+    await db
+      .from('orders')
+      .update({
+        status,
+        paid_at: status === 'paid' ? new Date().toISOString() : null,
+      })
+      .eq('order_id', params.id)
+
+    // =========================
+    // 🔥 LOGIC QUAN TRỌNG
+    // =========================
+
+    // ✅ từ chưa paid → paid
+    if (existing.status !== 'paid' && status === 'paid') {
+      console.log('🔥 ACTIVATE COURSE')
       await handlePaidSideEffects(params.id)
+    }
+
+    // ❌ từ paid → pending/failed
+    if (existing.status === 'paid' && status !== 'paid') {
+      console.log('🚫 REVOKE COURSE')
+      await handleUnpaidSideEffects(params.id)
     }
 
     return NextResponse.json({ ok: true })
